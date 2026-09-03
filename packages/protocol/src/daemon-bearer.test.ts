@@ -86,6 +86,19 @@ describe("daemon bearer subprotocols", () => {
     expect(extractBearerToken(`${WS_BEARER_HEX_PREFIX}4A4B`)).toBeNull();
   });
 
+  test("rejects malformed UTF-8 instead of folding it onto U+FFFD", () => {
+    // A lenient decoder maps each of these onto U+FFFD, which would let three
+    // distinct peer-supplied values authenticate a password containing it.
+    for (const malformed of ["ff", "fe", "c0"]) {
+      expect(extractBearerToken(`${WS_BEARER_HEX_PREFIX}${malformed}`)).toBeNull();
+    }
+
+    // The character itself still round-trips through its own encoding.
+    const [encoded] = buildBearerSubprotocols("\uFFFD");
+    expect(encoded).toBe(`${WS_BEARER_HEX_PREFIX}efbfbd`);
+    expect(extractBearerToken(encoded)).toBe("\uFFFD");
+  });
+
   test("does not confuse a password that looks like the hex prefix", () => {
     // `paseo.bearer.` and `paseo.bearer-hex.` diverge at the separator, so a
     // verbatim password can never be read as an encoded one.

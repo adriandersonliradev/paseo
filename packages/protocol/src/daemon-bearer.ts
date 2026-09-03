@@ -13,6 +13,9 @@
  * here because it has a single canonical spelling per input — no padding or
  * alphabet variants to validate against on the receiving end — and encodes with
  * nothing but `TextEncoder`, which browsers, Node and Hermes all provide.
+ *
+ * Decoding is strict in both directions of that promise: malformed UTF-8 is
+ * rejected rather than replaced, so one password never has two spellings.
  */
 
 export const WS_BEARER_PREFIX = "paseo.bearer.";
@@ -61,5 +64,14 @@ function decodeHex(value: string): string | null {
   for (let index = 0; index < bytes.length; index += 1) {
     bytes[index] = Number.parseInt(value.slice(index * 2, index * 2 + 2), 16);
   }
-  return new TextDecoder().decode(bytes);
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch (error) {
+    // A lenient decoder maps every malformed sequence onto U+FFFD, so distinct
+    // peer-supplied bytes would authenticate a password containing it.
+    if (error instanceof TypeError) {
+      return null;
+    }
+    throw error;
+  }
 }
