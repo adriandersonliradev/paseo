@@ -22,7 +22,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { StreamItem } from "@/types/stream";
 import type { Theme } from "@/styles/theme";
 import { useStableEvent } from "@/hooks/use-stable-event";
-import { useSettledKeyboardShift } from "@/hooks/use-keyboard-shift-style";
+import { useSettledKeyboardShift } from "@/hooks/keyboard-shift-context";
 import { resolveStreamKeyboardInset } from "@/hooks/keyboard-shift-policy";
 import { useRevisedHistoryRows } from "./history-row-revision";
 import { useBottomAnchorController } from "./bottom-anchor-controller";

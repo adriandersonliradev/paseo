@@ -19,7 +19,11 @@ import {
   resolveKeyboardShift,
   shouldReconcileHiddenKeyboardEnd,
 } from "@/hooks/keyboard-shift-policy";
-import { KeyboardShiftContext, useKeyboardShift } from "@/hooks/keyboard-shift-context";
+import {
+  KeyboardShiftContext,
+  SettledKeyboardShiftContext,
+  useKeyboardShift,
+} from "@/hooks/keyboard-shift-context";
 
 type KeyboardShiftMode = "translate" | "padding";
 
@@ -29,6 +33,10 @@ export function KeyboardShiftProvider({ children }: { children: ReactNode }) {
   const bottomInset = useSharedValue(insets.bottom);
   const isIos = Platform.OS === "ios";
   const isMoving = useSharedValue(false);
+  const [settledShift, setSettledShift] = useState(0);
+  const publishSettledShift = useCallback((nextShift: number) => {
+    setSettledShift((currentShift) => (currentShift === nextShift ? currentShift : nextShift));
+  }, []);
 
   useEffect(() => {
     bottomInset.value = insets.bottom;
@@ -63,6 +71,16 @@ export function KeyboardShiftProvider({ children }: { children: ReactNode }) {
     [isIos, isMoving, keyboardHeight, keyboardProgress],
   );
 
+  useAnimatedReaction(
+    () => ({ moving: isMoving.value, shift: shift.value }),
+    (current, previous) => {
+      if (!current.moving && (previous === null || previous.moving)) {
+        scheduleOnRN(publishSettledShift, current.shift);
+      }
+    },
+    [isMoving, publishSettledShift, shift],
+  );
+
   const value = useMemo(
     () => ({
       shift,
@@ -72,7 +90,11 @@ export function KeyboardShiftProvider({ children }: { children: ReactNode }) {
     [bottomInset, isMoving, shift],
   );
 
-  return createElement(KeyboardShiftContext.Provider, { value }, children);
+  return createElement(
+    KeyboardShiftContext.Provider,
+    { value },
+    createElement(SettledKeyboardShiftContext.Provider, { value: settledShift }, children),
+  );
 }
 
 export function useKeyboardShiftStyle(input: { mode: KeyboardShiftMode; enabled?: boolean }): {
@@ -97,25 +119,4 @@ export function useKeyboardShiftStyle(input: { mode: KeyboardShiftMode; enabled?
   }, [enabled, mode]);
 
   return { shift, style };
-}
-
-/** Returns the keyboard shift only after native keyboard motion has settled. */
-export function useSettledKeyboardShift(): number {
-  const { shift, isMoving } = useKeyboardShift();
-  const [settledShift, setSettledShift] = useState(0);
-  const publishSettledShift = useCallback((nextShift: number) => {
-    setSettledShift((currentShift) => (currentShift === nextShift ? currentShift : nextShift));
-  }, []);
-
-  useAnimatedReaction(
-    () => ({ moving: isMoving.value, shift: shift.value }),
-    (current, previous) => {
-      if (!current.moving && (previous === null || previous.moving)) {
-        scheduleOnRN(publishSettledShift, current.shift);
-      }
-    },
-    [isMoving, publishSettledShift, shift],
-  );
-
-  return settledShift;
 }
